@@ -5,17 +5,18 @@ const dotenv = require("dotenv");
 const { Parser } = require("json2csv");
 
 dotenv.config();
+
 const app = express();
 app.use(cors());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 const BASE_URL = "https://developer.setmore.com/api/v1";
 
 async function getAccessToken(refreshToken) {
-  const res = await axios.get(
+  const response = await axios.get(
     `${BASE_URL}/oauth2/token?refreshToken=${refreshToken}`
   );
-  return res.data.data.access_token;
+  return response.data.data.access_token;
 }
 
 async function getAllAppointments(accessToken) {
@@ -28,37 +29,44 @@ async function getAllAppointments(accessToken) {
       params: nextCursor ? { cursor: nextCursor } : {},
     });
 
-    const data = response.data;
-    allAppointments = allAppointments.concat(data.data.appointments || []);
-    nextCursor = data.data.cursor;
+    const data = response.data.data;
+    allAppointments.push(...(data.appointments || []));
+    nextCursor = data.cursor;
   } while (nextCursor);
 
   return allAppointments;
 }
 
+app.get("/", (req, res) => {
+  res.send("✅ Der Server läuft – verwende `/export` für den Export.");
+});
+
 app.get("/export", async (req, res) => {
   try {
-    const token = process.env.SETMORE_REFRESH_TOKEN;
-    const accessToken = await getAccessToken(token);
+    const refreshToken = process.env.SETMORE_REFRESH_TOKEN;
+    const accessToken = await getAccessToken(refreshToken);
     const appointments = await getAllAppointments(accessToken);
 
-    const fields = [
-      "staff_name",
-      "customer_name",
-      "service_name",
-      "start_time",
-      "end_time",
-      "status",
-    ];
-    const parser = new Parser({ fields });
-    const csv = parser.parse(appointments);
+    const cleaned = appointments.map((appt) => ({
+      staff_name: appt.staff_key,
+      customer_name: `${appt.customer?.first_name || ""} ${appt.customer?.last_name || ""}`,
+      service_name: appt.service_key,
+      start_time: appt.start_time,
+      end_time: appt.end_time,
+      status: appt.label,
+      email: appt.customer?.email_id,
+      phone: appt.customer?.cell_phone,
+    }));
+
+    const parser = new Parser();
+    const csv = parser.parse(cleaned);
 
     res.header("Content-Type", "text/csv");
     res.attachment("appointments.csv");
     res.send(csv);
-  } catch (error) {
-    console.error("❌ Fehler beim Export:", error.message);
-    res.status(500).send("Fehler beim Abrufen der Termine.");
+  } catch (err) {
+    console.error("❌ Fehler beim Export:", err.message);
+    res.status(500).send("Fehler beim Abrufen der Daten");
   }
 });
 
