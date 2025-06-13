@@ -10,11 +10,10 @@ const app = express();
 app.use(cors());
 
 const PORT = process.env.PORT || 10000;
-const BASE_URL = "https://api.setmore.com/v1";
 
 async function getAccessToken(refreshToken) {
-  const res = await axios.get(`${BASE_URL}/oauth2/token?refreshToken=${refreshToken}`);
-  return res.data.data.access_token;
+  const response = await axios.get(`https://developer.setmore.com/api/v1/o/oauth2/token?refreshToken=${refreshToken}`);
+  return response.data.data.access_token;
 }
 
 async function getAllAppointments(accessToken) {
@@ -23,8 +22,8 @@ async function getAllAppointments(accessToken) {
 
   do {
     const url = nextCursor
-      ? `${BASE_URL}/bookingapi/appointments?cursor=${nextCursor}`
-      : `${BASE_URL}/bookingapi/appointments`;
+      ? `https://developer.setmore.com/api/v1/bookingapi/appointments?cursor=${nextCursor}`
+      : `https://developer.setmore.com/api/v1/bookingapi/appointments`;
 
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${accessToken}` }
