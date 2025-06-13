@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
@@ -14,10 +13,8 @@ const PORT = process.env.PORT || 10000;
 const BASE_URL = "https://developer.setmore.com/api/v1";
 
 async function getAccessToken(refreshToken) {
-  const response = await axios.get(
-    `${BASE_URL}/oauth2/token?refreshToken=${refreshToken}`
-  );
-  return response.data.data.access_token;
+  const res = await axios.get(`${BASE_URL}/oauth2/token?refreshToken=${refreshToken}`);
+  return res.data.data.access_token;
 }
 
 async function getAllAppointments(accessToken) {
@@ -25,22 +22,25 @@ async function getAllAppointments(accessToken) {
   let nextCursor = null;
 
   do {
-    const response = await axios.get(`${BASE_URL}/bookingapi/appointments`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      params: nextCursor ? { cursor: nextCursor } : {},
+    const url = nextCursor
+      ? `${BASE_URL}/bookingapi/appointments?cursor=${nextCursor}`
+      : `${BASE_URL}/bookingapi/appointments`;
+
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${accessToken}` }
     });
 
-    const data = response.data.data;
-    allAppointments.push(...(data.appointments || []));
-    nextCursor = data.cursor;
+    const data = response.data;
+    if (data?.data?.appointments) {
+      allAppointments = allAppointments.concat(data.data.appointments);
+      nextCursor = data.data.cursor || null;
+    } else {
+      break;
+    }
   } while (nextCursor);
 
   return allAppointments;
 }
-
-app.get("/", (req, res) => {
-  res.send("✅ Der Server läuft – verwende /export für den Export der Termine als CSV.");
-});
 
 app.get("/export", async (req, res) => {
   try {
@@ -48,27 +48,24 @@ app.get("/export", async (req, res) => {
     const accessToken = await getAccessToken(refreshToken);
     const appointments = await getAllAppointments(accessToken);
 
-    const cleaned = appointments.map((appt) => ({
-      staff_name: appt.staff_key,
-      customer_name: `${appt.customer?.first_name || ""} ${appt.customer?.last_name || ""}`.trim(),
-      service_name: appt.service_key,
-      start_time: appt.start_time,
-      end_time: appt.end_time,
-      status: appt.label,
-      email: appt.customer?.email_id,
-      phone: appt.customer?.cell_phone,
-    }));
+    // Optional: nur bestätigte Termine filtern
+    const filtered = appointments.filter(a => a.status === "CONFIRMED");
 
-    const parser = new Parser();
-    const csv = parser.parse(cleaned);
+    const fields = ["staff_name", "customer_name", "service_name", "start_time", "end_time", "status"];
+    const parser = new Parser({ fields });
+    const csv = parser.parse(filtered);
 
     res.header("Content-Type", "text/csv");
     res.attachment("appointments.csv");
     res.send(csv);
-  } catch (err) {
-    console.error("❌ Fehler beim Export:", err.message);
-    res.status(500).send("Fehler beim Abrufen der Daten");
+  } catch (error) {
+    console.error("Fehler beim Export:", error.response?.data || error.message);
+    res.status(500).send("Fehler beim Abrufen der Termine.");
   }
+});
+
+app.get("/", (req, res) => {
+  res.send("✅ Setmore Exporter läuft. Verwende /export zum Download.");
 });
 
 app.listen(PORT, () => {
