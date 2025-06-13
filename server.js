@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
@@ -38,7 +39,7 @@ async function getAllAppointments(accessToken) {
 }
 
 app.get("/", (req, res) => {
-  res.send("✅ Der Server läuft – verwende `/export` für den Export.");
+  res.send("✅ Der Server läuft – verwende /export für den Export der Termine als CSV.");
 });
 
 app.get("/export", async (req, res) => {
@@ -49,7 +50,7 @@ app.get("/export", async (req, res) => {
 
     const cleaned = appointments.map((appt) => ({
       staff_name: appt.staff_key,
-      customer_name: `${appt.customer?.first_name || ""} ${appt.customer?.last_name || ""}`,
+      customer_name: `${appt.customer?.first_name || ""} ${appt.customer?.last_name || ""}`.trim(),
       service_name: appt.service_key,
       start_time: appt.start_time,
       end_time: appt.end_time,
