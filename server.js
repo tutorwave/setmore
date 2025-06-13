@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 
 const PORT = process.env.PORT || 10000;
-const BASE_URL = "https://developer.setmore.com/api/v1";
+const BASE_URL = "https://api.setmore.com/v1";
 
 async function getAccessToken(refreshToken) {
   const res = await axios.get(`${BASE_URL}/oauth2/token?refreshToken=${refreshToken}`);
@@ -48,7 +48,6 @@ app.get("/export", async (req, res) => {
     const accessToken = await getAccessToken(refreshToken);
     const appointments = await getAllAppointments(accessToken);
 
-    // Optional: nur bestätigte Termine filtern
     const filtered = appointments.filter(a => a.status === "CONFIRMED");
 
     const fields = ["staff_name", "customer_name", "service_name", "start_time", "end_time", "status"];
